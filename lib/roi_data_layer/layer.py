@@ -92,6 +92,8 @@ class RoIDataLayer(caffe.Layer):
 
         # data blob: holds a batch of N images, each with 3 channels
         idx = 0
+	print 'Top length : %d' % len(top)
+
         top[idx].reshape(cfg.TRAIN.IMS_PER_BATCH, 3,
             max(cfg.TRAIN.SCALES), cfg.TRAIN.MAX_SIZE)
         self._name_to_top_map['data'] = idx
@@ -118,10 +120,11 @@ class RoIDataLayer(caffe.Layer):
             top[idx].reshape(1)
             self._name_to_top_map['labels'] = idx
             idx += 1
-
+	    print "XX:", idx,type(top),dir(top)
             if cfg.TRAIN.BBOX_REG:
                 # bbox_targets blob: R bounding-box regression targets with 4
                 # targets per class
+		print 'Error idx is %d' % idx
                 top[idx].reshape(1, self._num_classes * 4)
                 self._name_to_top_map['bbox_targets'] = idx
                 idx += 1

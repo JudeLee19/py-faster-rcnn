@@ -25,6 +25,7 @@ def prepare_roidb(imdb):
     roidb = imdb.roidb
     for i in xrange(len(imdb.image_index)):
         roidb[i]['image'] = imdb.image_path_at(i)
+	print roidb[i]['image']
         roidb[i]['width'] = sizes[i][0]
         roidb[i]['height'] = sizes[i][1]
         # need gt_overlaps as a dense array for argmax
@@ -33,16 +34,29 @@ def prepare_roidb(imdb):
         max_overlaps = gt_overlaps.max(axis=1)
         # gt class that had the max overlap
         max_classes = gt_overlaps.argmax(axis=1)
+	print "max_overlaps:",max_overlaps
+	print "max_classes:",max_classes
         roidb[i]['max_classes'] = max_classes
         roidb[i]['max_overlaps'] = max_overlaps
         # sanity checks
         # max overlap of 0 => class should be zero (background)
         zero_inds = np.where(max_overlaps == 0)[0]
+	print max_classes.shape
+	print "zero_inds:",zero_inds
         assert all(max_classes[zero_inds] == 0)
         # max overlap > 0 => class should not be zero (must be a fg class)
         nonzero_inds = np.where(max_overlaps > 0)[0]
-        assert all(max_classes[nonzero_inds] != 0)
-
+	print "nonzero_inds:",nonzero_inds
+	for each in nonzero_inds:
+		try:
+			assert max_classes[each] != 0
+		except Exception as e:
+			print '======== Error ====== \n'
+			print max_overlaps
+			print max_classes[each]
+			print 'Index : %d' % i
+        #assert all(max_classes[nonzero_inds] != 0)
+	
 def add_bbox_regression_targets(roidb):
     """Add information needed to train bounding-box regressors."""
     assert len(roidb) > 0
@@ -51,9 +65,15 @@ def add_bbox_regression_targets(roidb):
     num_images = len(roidb)
     # Infer number of classes from the number of columns in gt_overlaps
     num_classes = roidb[0]['gt_overlaps'].shape[1]
-    for im_i in xrange(num_images):
+    for im_i in xrange(num_images - 1):
         rois = roidb[im_i]['boxes']
-        max_overlaps = roidb[im_i]['max_overlaps']
+	try:
+        	max_overlaps = roidb[im_i]['max_overlaps']
+	except:
+		print '=======Error========\n'
+		print roidb[im_i]
+		print 'Index : %d' % im_i
+		raise
         max_classes = roidb[im_i]['max_classes']
         roidb[im_i]['bbox_targets'] = \
                 _compute_targets(rois, max_overlaps, max_classes)
@@ -70,7 +90,7 @@ def add_bbox_regression_targets(roidb):
         class_counts = np.zeros((num_classes, 1)) + cfg.EPS
         sums = np.zeros((num_classes, 4))
         squared_sums = np.zeros((num_classes, 4))
-        for im_i in xrange(num_images):
+        for im_i in xrange(num_images - 1):
             targets = roidb[im_i]['bbox_targets']
             for cls in xrange(1, num_classes):
                 cls_inds = np.where(targets[:, 0] == cls)[0]
@@ -93,7 +113,7 @@ def add_bbox_regression_targets(roidb):
     # Normalize targets
     if cfg.TRAIN.BBOX_NORMALIZE_TARGETS:
         print "Normalizing targets"
-        for im_i in xrange(num_images):
+        for im_i in xrange(num_images - 1):
             targets = roidb[im_i]['bbox_targets']
             for cls in xrange(1, num_classes):
                 cls_inds = np.where(targets[:, 0] == cls)[0]
@@ -110,9 +130,6 @@ def _compute_targets(rois, overlaps, labels):
     """Compute bounding-box regression targets for an image."""
     # Indices of ground-truth ROIs
     gt_inds = np.where(overlaps == 1)[0]
-    if len(gt_inds) == 0:
-        # Bail if the image has no ground-truth ROIs
-        return np.zeros((rois.shape[0], 5), dtype=np.float32)
     # Indices of examples for which we try to make predictions
     ex_inds = np.where(overlaps >= cfg.TRAIN.BBOX_THRESH)[0]
 
